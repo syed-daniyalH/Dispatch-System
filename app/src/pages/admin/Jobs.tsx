@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Search,
     Filter,
@@ -82,13 +83,14 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import ColumnExportDialog from '@/components/modals/ColumnExportDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { fetchAdminTechnicians, getStoredAdminToken } from '@/lib/backend-api';
 import { MOCK_SERVICES } from './Services';
-import { MOCK_TECHS } from './Technicians';
 import { MOCK_DEALERSHIPS } from './Dealerships';
 
 // --- Types ---
 
-type JobStatus = 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+type JobStatus = 'admin_preview' | 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 type InvoiceState = 'draft' | 'pending_approval' | 'approved' | 'synced' | 'failed' | 'void';
 type Urgency = 'low' | 'normal' | 'high' | 'critical';
 
@@ -108,6 +110,10 @@ interface Job {
     allowed_actions: string[];
     ranking_score?: number;
     applied_rules?: string[];
+    requires_admin_confirmation?: boolean;
+    admin_confirmed_at?: string | null;
+    pending_assigned_technician_name?: string | null;
+    pending_push_to_available?: boolean;
 }
 
 
@@ -147,6 +153,60 @@ const JOB_EXPORT_COLUMNS = [
     'UpdatedAt',
 ];
 
+const buildDemoJobs = (techName: string | null): Job[] => {
+    const now = new Date();
+    const earlier = new Date(now.getTime() - (45 * 60 * 1000));
+    const dealershipA = DEALERSHIPS[0] ?? 'Audi de Quebec';
+    const dealershipB = DEALERSHIPS[1] ?? dealershipA;
+    const serviceA = SERVICES[0] ?? 'Ignition Repair';
+    const serviceB = SERVICES[1] ?? serviceA;
+
+    return [
+        {
+            job_id: 'job-demo-admin-preview-1',
+            job_code: 'SM2-DEMO-1001',
+            dealership_name: dealershipA,
+            service_name: serviceA,
+            vehicle_summary: '2024 Audi A4',
+            urgency: 'high',
+            assigned_technician_name: null,
+            pending_assigned_technician_name: techName,
+            job_status: 'admin_preview',
+            invoice_state: 'draft',
+            attention_flag: false,
+            created_at: earlier.toISOString(),
+            updated_at: earlier.toISOString(),
+            allowed_actions: ['view', 'edit', 'cancel', 'assign', 'confirm'],
+            ranking_score: 15,
+            applied_rules: ['Demo Rule: High priority dealership'],
+            requires_admin_confirmation: true,
+            admin_confirmed_at: null,
+            pending_push_to_available: true,
+        },
+        {
+            job_id: 'job-demo-pending-2',
+            job_code: 'SM2-DEMO-1002',
+            dealership_name: dealershipB,
+            service_name: serviceB,
+            vehicle_summary: '2023 Ford F-150',
+            urgency: 'normal',
+            assigned_technician_name: techName,
+            pending_assigned_technician_name: null,
+            job_status: 'pending',
+            invoice_state: 'draft',
+            attention_flag: false,
+            created_at: now.toISOString(),
+            updated_at: now.toISOString(),
+            allowed_actions: ['view', 'edit', 'cancel', 'assign'],
+            ranking_score: 8,
+            applied_rules: ['Demo Rule: Normal queue'],
+            requires_admin_confirmation: false,
+            admin_confirmed_at: now.toISOString(),
+            pending_push_to_available: false,
+        },
+    ];
+};
+
 const loadPersistedJobs = (): Job[] => {
     try {
         const raw = localStorage.getItem(ADMIN_JOBS_STORAGE_KEY);
@@ -171,13 +231,16 @@ const appendAuditLog = (
     // Audit logging intentionally disabled.
 };
 
-const syncJobToAvailableQueue = (job: Job) => {
+const syncJobToAvailableQueue = (
+    job: Job,
+    technicianOptions: Array<{ id: string; name: string }>,
+) => {
     if (job.job_status !== 'pending') return;
 
     const dealershipLocation =
         MOCK_DEALERSHIPS.find((dealership) => dealership.name === job.dealership_name)?.city || 'Unspecified';
     const assignedTechId =
-        MOCK_TECHS.find((tech) => tech.name === job.assigned_technician_name)?.id;
+        technicianOptions.find((tech) => tech.name === job.assigned_technician_name)?.id;
 
     const queueJob = {
         job_id: job.job_id,
@@ -204,11 +267,25 @@ const syncJobToAvailableQueue = (job: Job) => {
     }
 };
 
+
+const removeJobFromAvailableQueue = (jobId: string) => {
+    try {
+        const raw = localStorage.getItem(AVAILABLE_JOBS_STORAGE_KEY);
+        const existing = raw ? JSON.parse(raw) : [];
+        const safeExisting = Array.isArray(existing) ? existing : [];
+        const filtered = safeExisting.filter((entry) => entry?.job_id !== jobId);
+        localStorage.setItem(AVAILABLE_JOBS_STORAGE_KEY, JSON.stringify(filtered));
+    } catch {
+        // Ignore queue cleanup errors in local mock mode.
+    }
+};
+
 // --- Components ---
 
 function StatusBadge({ status, type }: { status: string; type: 'job' | 'invoice' | 'urgency' }) {
     const styles: Record<string, string> = {
         // Job Status
+        admin_preview: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
         pending: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
         scheduled: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
         in_progress: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800',
@@ -232,6 +309,7 @@ function StatusBadge({ status, type }: { status: string; type: 'job' | 'invoice'
     };
 
     const labels: Record<string, string> = {
+        admin_preview: 'Admin Preview',
         pending: 'Pending', scheduled: 'Scheduled', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled',
         draft: 'Draft', pending_approval: 'Needs Approval', approved: 'Approved', synced: ' synced', failed: 'Failed', void: 'Void',
         low: 'Low', normal: 'Normal', high: 'High', critical: 'Critical'
@@ -245,6 +323,19 @@ function StatusBadge({ status, type }: { status: string; type: 'job' | 'invoice'
 }
 
 export default function JobsPage() {
+    const navigate = useNavigate();
+    const { technicianAccounts } = useAuth();
+    const [technicianDetailsById, setTechnicianDetailsById] = useState<Record<string, { zones: string[]; skills: string[] }>>({});
+    const technicianOptions = useMemo(
+        () =>
+            technicianAccounts.map((tech) => ({
+                id: tech.id,
+                name: tech.name,
+                zones: technicianDetailsById[tech.id]?.zones ?? [],
+                skills: technicianDetailsById[tech.id]?.skills ?? [],
+            })),
+        [technicianAccounts, technicianDetailsById],
+    );
     const initialNewJobForm: NewJobFormState = {
         dealership_name: DEALERSHIPS[0] ?? '',
         service_name: SERVICES[0] ?? '',
@@ -261,6 +352,9 @@ export default function JobsPage() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [createJobOpen, setCreateJobOpen] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+    const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
+    const [selectedTechnicianName, setSelectedTechnicianName] = useState<string>('unassigned');
     const [newJobForm, setNewJobForm] = useState<NewJobFormState>(initialNewJobForm);
 
     // Filters
@@ -268,6 +362,50 @@ export default function JobsPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+
+    useEffect(() => {
+        const token = getStoredAdminToken();
+        if (!token) {
+            setTechnicianDetailsById({});
+            return;
+        }
+
+        let cancelled = false;
+        const loadTechnicianDetails = async () => {
+            try {
+                const backendRows = await fetchAdminTechnicians(token);
+                if (cancelled) {
+                    return;
+                }
+
+                const nextDetails: Record<string, { zones: string[]; skills: string[] }> = {};
+                backendRows.forEach((row) => {
+                    nextDetails[row.id] = {
+                        zones: row.zones.map((zone) => zone.name),
+                        skills: row.skills.map((skill) => skill.name),
+                    };
+                });
+                setTechnicianDetailsById(nextDetails);
+            } catch {
+                if (!cancelled) {
+                    setTechnicianDetailsById({});
+                }
+            }
+        };
+
+        void loadTechnicianDetails();
+        return () => {
+            cancelled = true;
+        };
+    }, [technicianAccounts]);
+
+    useEffect(() => {
+        const existing = loadPersistedJobs();
+        if (existing.length > 0) {
+            return;
+        }
+        persistJobs(buildDemoJobs(technicianOptions[0]?.name ?? null));
+    }, [technicianOptions]);
 
     // Load Data Simulation
     const fetchData = () => {
@@ -373,34 +511,34 @@ export default function JobsPage() {
             service_name: serviceName,
             vehicle_summary: vehicleSummary,
             urgency: reverseUrgencyMap[priorityResult.finalUrgency] || newJobForm.urgency,
-            assigned_technician_name: newJobForm.assigned_technician_name === 'unassigned' ? null : newJobForm.assigned_technician_name,
-            job_status: 'pending',
+            assigned_technician_name: null,
+            pending_assigned_technician_name: newJobForm.assigned_technician_name === 'unassigned' ? null : newJobForm.assigned_technician_name,
+            job_status: 'admin_preview',
             invoice_state: 'draft',
             attention_flag: false,
             created_at: nowIso,
             updated_at: nowIso,
-            allowed_actions: ['view', 'edit', 'cancel', 'assign'],
+            allowed_actions: ['view', 'edit', 'cancel', 'assign', 'confirm'],
             ranking_score: priorityResult.score,
             applied_rules: priorityResult.appliedRules,
+            requires_admin_confirmation: true,
+            admin_confirmed_at: null,
+            pending_push_to_available: Boolean(newJobForm.push_to_available),
         };
 
         const nextPersisted = [newJob, ...loadPersistedJobs()];
         persistJobs(nextPersisted);
 
-        if (newJobForm.push_to_available) {
-            syncJobToAvailableQueue(newJob);
-        }
-
         appendAuditLog(
             'job.created',
-            `Job ${newJob.job_code} created from Jobs section`,
+            `Job ${newJob.job_code} created and sent to admin preview`,
             {
                 job_id: newJob.job_id,
                 job_code: newJob.job_code,
                 dealership_name: newJob.dealership_name,
                 service_name: newJob.service_name,
                 status: newJob.job_status,
-                pushed_to_available_queue: newJobForm.push_to_available,
+                pushed_to_available_queue_after_confirmation: newJobForm.push_to_available,
             }
         );
 
@@ -410,6 +548,137 @@ export default function JobsPage() {
         fetchData();
     };
 
+    const updatePersistedJob = (jobId: string, updater: (job: Job) => Job) => {
+        const current = loadPersistedJobs();
+        const next = current.map((job) => (job.job_id === jobId ? updater(job) : job));
+        persistJobs(next);
+        return next.find((job) => job.job_id === jobId) ?? null;
+    };
+
+    const handleConfirmAndAssign = (job: Job) => {
+        if (job.job_status !== 'admin_preview') {
+            return;
+        }
+
+        const selectedTech = job.pending_assigned_technician_name ?? 'Unassigned';
+        const confirmed = window.confirm(
+            `Confirm job ${job.job_code} and assign to ${selectedTech}? This is required before technician dispatch.`
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const updatedJob = updatePersistedJob(job.job_id, (current) => ({
+            ...current,
+            job_status: 'pending',
+            assigned_technician_name: current.pending_assigned_technician_name ?? current.assigned_technician_name ?? null,
+            pending_assigned_technician_name: null,
+            requires_admin_confirmation: false,
+            admin_confirmed_at: nowIso,
+            updated_at: nowIso,
+            allowed_actions: current.allowed_actions.filter((action) => action !== 'confirm'),
+        }));
+
+        if (updatedJob && (updatedJob.pending_push_to_available ?? false)) {
+            syncJobToAvailableQueue(updatedJob, technicianOptions);
+        }
+
+        appendAuditLog(
+            'job.confirmed',
+            `Job ${job.job_code} confirmed by admin`,
+            {
+                job_id: job.job_id,
+                job_code: job.job_code,
+                assigned_technician_name: updatedJob?.assigned_technician_name ?? null,
+                admin_confirmed_at: nowIso,
+                pushed_to_available_queue: updatedJob?.pending_push_to_available ?? false,
+            }
+        );
+
+        fetchData();
+    };
+
+    const handleOpenJob = (job: Job) => {
+        navigate(`/admin/jobs/${job.job_id}`);
+    };
+
+    const handleAssignTechnician = (job: Job) => {
+        if (job.job_status === 'admin_preview') {
+            window.alert('Please use Confirm & Assign first. Admin confirmation is required before assignment.');
+            return;
+        }
+        setJobToAssign(job);
+        setSelectedTechnicianName(job.assigned_technician_name ?? 'unassigned');
+        setAssignDialogOpen(true);
+    };
+
+    const submitTechnicianAssignment = () => {
+        if (!jobToAssign) {
+            return;
+        }
+
+        let nextAssignedName: string | null = null;
+        if (selectedTechnicianName !== 'unassigned') {
+            const found = technicianOptions.find((tech) => tech.name === selectedTechnicianName);
+            if (!found) {
+                window.alert('Invalid technician selected.');
+                return;
+            }
+            nextAssignedName = found.name;
+        }
+
+        const nowIso = new Date().toISOString();
+        const updatedJob = updatePersistedJob(jobToAssign.job_id, (current) => ({
+            ...current,
+            assigned_technician_name: nextAssignedName,
+            pending_assigned_technician_name: null,
+            updated_at: nowIso,
+        }));
+        if (updatedJob && updatedJob.job_status === 'pending') {
+            syncJobToAvailableQueue(updatedJob, technicianOptions);
+        }
+
+        appendAuditLog(
+            'job.assigned',
+            `Technician assignment updated for ${jobToAssign.job_code}`,
+            {
+                job_id: jobToAssign.job_id,
+                job_code: jobToAssign.job_code,
+                assigned_technician_name: nextAssignedName,
+            },
+        );
+
+        setAssignDialogOpen(false);
+        setJobToAssign(null);
+        setSelectedTechnicianName('unassigned');
+        fetchData();
+    };
+
+    const handleCancelJob = (job: Job) => {
+        if (!window.confirm(`Cancel job ${job.job_code}?`)) {
+            return;
+        }
+
+        const nowIso = new Date().toISOString();
+        updatePersistedJob(job.job_id, (current) => ({
+            ...current,
+            job_status: 'cancelled',
+            updated_at: nowIso,
+            allowed_actions: current.allowed_actions.filter((action) => action !== 'assign' && action !== 'confirm' && action !== 'cancel'),
+        }));
+        removeJobFromAvailableQueue(job.job_id);
+        appendAuditLog(
+            'job.cancelled',
+            `Job ${job.job_code} cancelled by admin`,
+            {
+                job_id: job.job_id,
+                job_code: job.job_code,
+            },
+            'warning',
+        );
+        fetchData();
+    };
     const getJobsForExport = () => (
         selectedRows.size > 0
             ? data.filter((job) => selectedRows.has(job.job_id))
@@ -465,7 +734,7 @@ export default function JobsPage() {
                     <DialogHeader>
                         <DialogTitle>Create New Job</DialogTitle>
                         <DialogDescription>
-                            Add a job from the Jobs section. You can also push it to technician Available Jobs as READY_FOR_TECH_ACCEPTANCE.
+                            New jobs are created in Admin Preview. Admin confirmation is required before any technician assignment or dispatch queue push.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
@@ -540,7 +809,7 @@ export default function JobsPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="unassigned">Unassigned</SelectItem>
-                                        {MOCK_TECHS.map((tech) => (
+                                        {technicianOptions.map((tech) => (
                                             <SelectItem key={tech.id} value={tech.name}>{tech.name}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -554,7 +823,7 @@ export default function JobsPage() {
                                 id="push-to-available"
                             />
                             <Label htmlFor="push-to-available" className="text-sm font-medium cursor-pointer">
-                                Push to technician queue as `READY_FOR_TECH_ACCEPTANCE`
+                                Auto-push to technician queue after admin confirmation
                             </Label>
                         </div>
                     </div>
@@ -569,7 +838,99 @@ export default function JobsPage() {
                             Cancel
                         </Button>
                         <Button className="bg-[#2F8E92] hover:bg-[#267276]" onClick={handleCreateJob}>
-                            Create Job
+                            Create in Preview
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={assignDialogOpen}
+                onOpenChange={(open) => {
+                    setAssignDialogOpen(open);
+                    if (!open) {
+                        setJobToAssign(null);
+                        setSelectedTechnicianName('unassigned');
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Assign Technician</DialogTitle>
+                        <DialogDescription>
+                            {jobToAssign
+                                ? `Select technician for ${jobToAssign.job_code}`
+                                : 'Select technician for this job'}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 max-h-[420px] overflow-auto pr-1">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedTechnicianName('unassigned')}
+                            className={cn(
+                                'w-full text-left rounded-lg border p-3 transition-colors',
+                                selectedTechnicianName === 'unassigned'
+                                    ? 'border-[#2F8E92] bg-[#2F8E92]/5'
+                                    : 'border-border hover:bg-muted/40'
+                            )}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="font-medium text-sm">Unassigned</div>
+                                <Badge variant="outline" className="text-xs">No tech</Badge>
+                            </div>
+                        </button>
+
+                        {technicianOptions.map((tech) => (
+                            <button
+                                key={tech.id}
+                                type="button"
+                                onClick={() => setSelectedTechnicianName(tech.name)}
+                                className={cn(
+                                    'w-full text-left rounded-lg border p-3 transition-colors',
+                                    selectedTechnicianName === tech.name
+                                        ? 'border-[#2F8E92] bg-[#2F8E92]/5'
+                                        : 'border-border hover:bg-muted/40'
+                                )}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="font-semibold text-sm text-foreground">{tech.name}</div>
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {tech.zones.length > 0 ? (
+                                                tech.zones.map((zone) => (
+                                                    <Badge key={`${tech.id}-zone-${zone}`} variant="outline" className="text-[10px]">
+                                                        {zone}
+                                                    </Badge>
+                                                ))
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] text-muted-foreground">No Zones</Badge>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {tech.skills.length > 0 ? (
+                                                tech.skills.map((skill) => (
+                                                    <Badge key={`${tech.id}-skill-${skill}`} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                                                        {skill}
+                                                    </Badge>
+                                                ))
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] text-muted-foreground">No Skills</Badge>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="w-5 h-5 rounded-full border flex items-center justify-center mt-0.5">
+                                        {selectedTechnicianName === tech.name && <div className="w-2.5 h-2.5 rounded-full bg-[#2F8E92]" />}
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                        <Button className="bg-[#2F8E92] hover:bg-[#267276]" onClick={submitTechnicianAssignment}>
+                            Save Assignment
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -609,6 +970,7 @@ export default function JobsPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="admin_preview">Admin Preview</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>
@@ -771,6 +1133,16 @@ export default function JobsPage() {
                                                     </div>
                                                     <span className="text-sm text-gray-700">{job.assigned_technician_name}</span>
                                                 </div>
+                                            ) : job.job_status === 'admin_preview' && job.pending_assigned_technician_name ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-[10px] font-bold text-violet-700">
+                                                        {job.pending_assigned_technician_name.substring(0, 2)}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm text-violet-700">{job.pending_assigned_technician_name}</span>
+                                                        <span className="text-[10px] text-violet-500">Pending admin confirmation</span>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <span className="text-xs text-gray-400 italic">Unassigned</span>
                                             )}
@@ -809,14 +1181,23 @@ export default function JobsPage() {
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem>Open Job</DropdownMenuItem>
-                                                    <DropdownMenuItem>View Invoice</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenJob(job)}>Open Job</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
+                                                    {(job.allowed_actions.includes('confirm') || job.job_status === 'admin_preview') && (
+                                                        <DropdownMenuItem
+                                                            className="text-violet-700 focus:text-violet-700 focus:bg-violet-50"
+                                                            onClick={() => handleConfirmAndAssign(job)}
+                                                        >
+                                                            Confirm & Assign
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     {job.allowed_actions.includes('assign') && (
-                                                        <DropdownMenuItem>Assign Technician</DropdownMenuItem>
+                                                        <DropdownMenuItem disabled={job.job_status === 'admin_preview'} onClick={() => handleAssignTechnician(job)}>
+                                                            Assign Technician
+                                                        </DropdownMenuItem>
                                                     )}
                                                     {job.allowed_actions.includes('cancel') && (
-                                                        <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">Cancel Job</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => handleCancelJob(job)}>Cancel Job</DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -942,3 +1323,5 @@ function Building2Icon(props: any) {
         </svg>
     )
 }
+
+
