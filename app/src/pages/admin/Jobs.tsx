@@ -79,6 +79,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
@@ -152,6 +160,20 @@ const JOB_EXPORT_COLUMNS = [
     'CreatedAt',
     'UpdatedAt',
 ];
+
+const normalizeText = (value: string) =>
+    value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+const textTokens = (value: string) =>
+    normalizeText(value)
+        .split(' ')
+        .filter((token) => token.length >= 3);
 
 const buildDemoJobs = (techName: string | null): Job[] => {
     const now = new Date();
@@ -352,7 +374,7 @@ export default function JobsPage() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [createJobOpen, setCreateJobOpen] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
-    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+    const [assignSidebarOpen, setAssignSidebarOpen] = useState(false);
     const [jobToAssign, setJobToAssign] = useState<Job | null>(null);
     const [selectedTechnicianName, setSelectedTechnicianName] = useState<string>('unassigned');
     const [newJobForm, setNewJobForm] = useState<NewJobFormState>(initialNewJobForm);
@@ -362,6 +384,41 @@ export default function JobsPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [invoiceFilter, setInvoiceFilter] = useState<string>('all');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+
+    const assignJobZone = useMemo(() => {
+        if (!jobToAssign) return '';
+        return MOCK_DEALERSHIPS.find((dealership) => dealership.name === jobToAssign.dealership_name)?.city ?? '';
+    }, [jobToAssign]);
+
+    const eligibleTechnicianIds = useMemo(() => {
+        if (!jobToAssign) return new Set<string>();
+
+        const requiredZone = normalizeText(assignJobZone);
+        const service = normalizeText(jobToAssign.service_name);
+        const serviceWords = textTokens(jobToAssign.service_name);
+
+        return new Set(
+            technicianOptions
+                .filter((tech) => {
+                    const hasZone =
+                        requiredZone.length > 0 &&
+                        tech.zones.some((zone) => normalizeText(zone) === requiredZone);
+                    if (!hasZone) return false;
+
+                    const hasSkill = tech.skills.some((skill) => {
+                        const normalizedSkill = normalizeText(skill);
+                        if (!normalizedSkill) return false;
+                        if (service.includes(normalizedSkill) || normalizedSkill.includes(service)) return true;
+
+                        const skillWords = textTokens(skill);
+                        return skillWords.some((word) => serviceWords.includes(word));
+                    });
+
+                    return hasSkill;
+                })
+                .map((tech) => tech.id),
+        );
+    }, [assignJobZone, jobToAssign, technicianOptions]);
 
     useEffect(() => {
         const token = getStoredAdminToken();
@@ -555,62 +612,10 @@ export default function JobsPage() {
         return next.find((job) => job.job_id === jobId) ?? null;
     };
 
-    const handleConfirmAndAssign = (job: Job) => {
-        if (job.job_status !== 'admin_preview') {
-            return;
-        }
-
-        const selectedTech = job.pending_assigned_technician_name ?? 'Unassigned';
-        const confirmed = window.confirm(
-            `Confirm job ${job.job_code} and assign to ${selectedTech}? This is required before technician dispatch.`
-        );
-        if (!confirmed) {
-            return;
-        }
-
-        const nowIso = new Date().toISOString();
-        const updatedJob = updatePersistedJob(job.job_id, (current) => ({
-            ...current,
-            job_status: 'pending',
-            assigned_technician_name: current.pending_assigned_technician_name ?? current.assigned_technician_name ?? null,
-            pending_assigned_technician_name: null,
-            requires_admin_confirmation: false,
-            admin_confirmed_at: nowIso,
-            updated_at: nowIso,
-            allowed_actions: current.allowed_actions.filter((action) => action !== 'confirm'),
-        }));
-
-        if (updatedJob && (updatedJob.pending_push_to_available ?? false)) {
-            syncJobToAvailableQueue(updatedJob, technicianOptions);
-        }
-
-        appendAuditLog(
-            'job.confirmed',
-            `Job ${job.job_code} confirmed by admin`,
-            {
-                job_id: job.job_id,
-                job_code: job.job_code,
-                assigned_technician_name: updatedJob?.assigned_technician_name ?? null,
-                admin_confirmed_at: nowIso,
-                pushed_to_available_queue: updatedJob?.pending_push_to_available ?? false,
-            }
-        );
-
-        fetchData();
-    };
-
-    const handleOpenJob = (job: Job) => {
-        navigate(`/admin/jobs/${job.job_id}`);
-    };
-
     const handleAssignTechnician = (job: Job) => {
-        if (job.job_status === 'admin_preview') {
-            window.alert('Please use Confirm & Assign first. Admin confirmation is required before assignment.');
-            return;
-        }
         setJobToAssign(job);
         setSelectedTechnicianName(job.assigned_technician_name ?? 'unassigned');
-        setAssignDialogOpen(true);
+        setAssignSidebarOpen(true);
     };
 
     const submitTechnicianAssignment = () => {
@@ -635,9 +640,6 @@ export default function JobsPage() {
             pending_assigned_technician_name: null,
             updated_at: nowIso,
         }));
-        if (updatedJob && updatedJob.job_status === 'pending') {
-            syncJobToAvailableQueue(updatedJob, technicianOptions);
-        }
 
         appendAuditLog(
             'job.assigned',
@@ -649,34 +651,9 @@ export default function JobsPage() {
             },
         );
 
-        setAssignDialogOpen(false);
+        setAssignSidebarOpen(false);
         setJobToAssign(null);
         setSelectedTechnicianName('unassigned');
-        fetchData();
-    };
-
-    const handleCancelJob = (job: Job) => {
-        if (!window.confirm(`Cancel job ${job.job_code}?`)) {
-            return;
-        }
-
-        const nowIso = new Date().toISOString();
-        updatePersistedJob(job.job_id, (current) => ({
-            ...current,
-            job_status: 'cancelled',
-            updated_at: nowIso,
-            allowed_actions: current.allowed_actions.filter((action) => action !== 'assign' && action !== 'confirm' && action !== 'cancel'),
-        }));
-        removeJobFromAvailableQueue(job.job_id);
-        appendAuditLog(
-            'job.cancelled',
-            `Job ${job.job_code} cancelled by admin`,
-            {
-                job_id: job.job_id,
-                job_code: job.job_code,
-            },
-            'warning',
-        );
         fetchData();
     };
     const getJobsForExport = () => (
@@ -844,27 +821,38 @@ export default function JobsPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog
-                open={assignDialogOpen}
+            <Sheet
+                open={assignSidebarOpen}
                 onOpenChange={(open) => {
-                    setAssignDialogOpen(open);
+                    setAssignSidebarOpen(open);
                     if (!open) {
                         setJobToAssign(null);
                         setSelectedTechnicianName('unassigned');
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Assign Technician</DialogTitle>
-                        <DialogDescription>
-                            {jobToAssign
-                                ? `Select technician for ${jobToAssign.job_code}`
-                                : 'Select technician for this job'}
-                        </DialogDescription>
-                    </DialogHeader>
+                <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
+                    <SheetHeader className="border-b px-5 py-4">
+                        <SheetTitle>Assign Technician</SheetTitle>
+                        <SheetDescription>
+                            {jobToAssign ? `Select technician for ${jobToAssign.job_code}` : 'Select technician for this job'}
+                        </SheetDescription>
+                    </SheetHeader>
 
-                    <div className="space-y-3 max-h-[420px] overflow-auto pr-1">
+                    <div className="px-5 py-4 border-b bg-muted/20">
+                        {jobToAssign ? (
+                            <div className="space-y-1.5 text-sm">
+                                <div className="font-semibold text-foreground">{jobToAssign.service_name}</div>
+                                <div className="text-muted-foreground">{jobToAssign.dealership_name}</div>
+                                <div className="text-muted-foreground">{jobToAssign.vehicle_summary}</div>
+                                <div className="text-xs font-medium text-[#2F8E92]">
+                                    Required zone: {assignJobZone || 'Unknown'} | Required skill: {jobToAssign.service_name}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="p-4 space-y-3 overflow-y-auto">
                         <button
                             type="button"
                             onClick={() => setSelectedTechnicianName('unassigned')}
@@ -881,60 +869,80 @@ export default function JobsPage() {
                             </div>
                         </button>
 
-                        {technicianOptions.map((tech) => (
-                            <button
-                                key={tech.id}
-                                type="button"
-                                onClick={() => setSelectedTechnicianName(tech.name)}
-                                className={cn(
-                                    'w-full text-left rounded-lg border p-3 transition-colors',
-                                    selectedTechnicianName === tech.name
-                                        ? 'border-[#2F8E92] bg-[#2F8E92]/5'
-                                        : 'border-border hover:bg-muted/40'
-                                )}
-                            >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <div className="font-semibold text-sm text-foreground">{tech.name}</div>
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                            {tech.zones.length > 0 ? (
-                                                tech.zones.map((zone) => (
+                        {technicianOptions.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                No technicians available.
+                            </div>
+                        ) : eligibleTechnicianIds.size === 0 ? (
+                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                No exact zone + skill match found. You can still assign any technician manually.
+                            </div>
+                        ) : null}
+
+                        {technicianOptions
+                            .slice()
+                            .sort((a, b) => {
+                                const aMatched = eligibleTechnicianIds.has(a.id) ? 1 : 0;
+                                const bMatched = eligibleTechnicianIds.has(b.id) ? 1 : 0;
+                                return bMatched - aMatched;
+                            })
+                            .map((tech) => (
+                                <button
+                                    key={tech.id}
+                                    type="button"
+                                    onClick={() => setSelectedTechnicianName(tech.name)}
+                                    className={cn(
+                                        'w-full text-left rounded-lg border p-3 transition-colors',
+                                        selectedTechnicianName === tech.name
+                                            ? 'border-[#2F8E92] bg-[#2F8E92]/5'
+                                            : 'border-border hover:bg-muted/40'
+                                    )}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div className="font-semibold text-sm text-foreground flex items-center gap-2">
+                                                {tech.name}
+                                                {eligibleTechnicianIds.has(tech.id) ? (
+                                                    <Badge className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        Recommended
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-[10px]">
+                                                        Manual assign
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {tech.zones.map((zone) => (
                                                     <Badge key={`${tech.id}-zone-${zone}`} variant="outline" className="text-[10px]">
                                                         {zone}
                                                     </Badge>
-                                                ))
-                                            ) : (
-                                                <Badge variant="outline" className="text-[10px] text-muted-foreground">No Zones</Badge>
-                                            )}
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                            {tech.skills.length > 0 ? (
-                                                tech.skills.map((skill) => (
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {tech.skills.map((skill) => (
                                                     <Badge key={`${tech.id}-skill-${skill}`} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
                                                         {skill}
                                                     </Badge>
-                                                ))
-                                            ) : (
-                                                <Badge variant="outline" className="text-[10px] text-muted-foreground">No Skills</Badge>
-                                            )}
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="w-5 h-5 rounded-full border flex items-center justify-center mt-0.5">
+                                            {selectedTechnicianName === tech.name && <div className="w-2.5 h-2.5 rounded-full bg-[#2F8E92]" />}
                                         </div>
                                     </div>
-                                    <div className="w-5 h-5 rounded-full border flex items-center justify-center mt-0.5">
-                                        {selectedTechnicianName === tech.name && <div className="w-2.5 h-2.5 rounded-full bg-[#2F8E92]" />}
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
+                                </button>
+                            ))}
                     </div>
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                    <SheetFooter className="border-t px-5 py-4 sm:flex-row sm:justify-end gap-2">
+                        <Button variant="outline" onClick={() => setAssignSidebarOpen(false)}>Cancel</Button>
                         <Button className="bg-[#2F8E92] hover:bg-[#267276]" onClick={submitTechnicianAssignment}>
                             Save Assignment
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
 
             <ColumnExportDialog
                 open={exportModalOpen}
@@ -1172,35 +1180,15 @@ export default function JobsPage() {
                                             <StatusBadge status={job.invoice_state} type="invoice" />
                                         </TableCell>
                                         <TableCell className="text-right pr-4">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-900">
-                                                        <MoreHorizontal className="w-4 h-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => handleOpenJob(job)}>Open Job</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    {(job.allowed_actions.includes('confirm') || job.job_status === 'admin_preview') && (
-                                                        <DropdownMenuItem
-                                                            className="text-violet-700 focus:text-violet-700 focus:bg-violet-50"
-                                                            onClick={() => handleConfirmAndAssign(job)}
-                                                        >
-                                                            Confirm & Assign
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {job.allowed_actions.includes('assign') && (
-                                                        <DropdownMenuItem disabled={job.job_status === 'admin_preview'} onClick={() => handleAssignTechnician(job)}>
-                                                            Assign Technician
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {job.allowed_actions.includes('cancel') && (
-                                                        <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => handleCancelJob(job)}>Cancel Job</DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-8"
+                                                onClick={() => handleAssignTechnician(job)}
+                                                disabled={job.job_status === 'cancelled'}
+                                            >
+                                                Assign tech
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
