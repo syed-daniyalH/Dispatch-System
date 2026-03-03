@@ -4,6 +4,7 @@ import { Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -19,6 +20,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('admin123');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const from = (location.state as NavigationState | null)?.from;
 
@@ -74,6 +76,15 @@ export default function AdminLoginPage() {
                 autoComplete="current-password"
                 required
               />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setForgotPasswordOpen(true)}
+                  className="text-sm font-medium text-[#2F8E92] transition-colors hover:text-[#27797d] hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
 
             {errorMessage && (
@@ -90,6 +101,27 @@ export default function AdminLoginPage() {
           </form>
         </CardContent>
       </Card>
+
+      <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset admin password</DialogTitle>
+            <DialogDescription>
+              Self-service password reset is not available yet for the single admin portal account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-[#cfe3e7] bg-[#f3fafb] px-4 py-3 text-sm text-slate-700">
+            Contact the system owner or technical support to reset the admin login credentials and issue updated access.
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setForgotPasswordOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
