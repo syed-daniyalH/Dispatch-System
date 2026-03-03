@@ -352,18 +352,18 @@ export default function ProfilePage() {
 
             <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
                 {loading ? <Card className="p-6">Loading profile...</Card> : null}
-                {error ? <Card className="p-4 border-red-200 bg-red-50 text-red-700 text-sm">{error}</Card> : null}
+                {error ? <Card className="p-4 border-red-200 bg-red-50 text-red-700 text-sm dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}</Card> : null}
 
                 {isSettingsView ? (
                     <>
-                        <Button type="button" variant="ghost" onClick={openProfileView} className="justify-start px-1 text-gray-600">
+                        <Button type="button" variant="ghost" onClick={openProfileView} className="justify-start px-1 text-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
                             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Profile
                         </Button>
 
-                        <Card className="p-6 border-gray-200">
+                        <Card className="p-6 border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-4 mb-6">
                                 {profilePictureUrl ? (
-                                    <img src={profilePictureUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-gray-200" />
+                                    <img src={profilePictureUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
                                 ) : (
                                     <div className="w-16 h-16 rounded-full bg-[#2F8E92] flex items-center justify-center text-white text-2xl font-bold">
                                         {initials}
@@ -378,15 +378,15 @@ export default function ProfilePage() {
                             {!isPreviewMode ? (
                                 <div className="space-y-3">
                                     <div className="space-y-1">
-                                        <Label>Full Name</Label>
+                                        <Label className="dark:text-gray-200">Full Name</Label>
                                         <Input value={fullName} onChange={(event) => setFullName(event.target.value)} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label>Phone</Label>
+                                        <Label className="dark:text-gray-200">Phone</Label>
                                         <Input value={phone} onChange={(event) => setPhone(event.target.value)} />
                                     </div>
                                     <div className="space-y-1">
-                                        <Label>Profile Picture URL</Label>
+                                        <Label className="dark:text-gray-200">Profile Picture URL</Label>
                                         <Input value={profilePictureUrl} onChange={(event) => setProfilePictureUrl(event.target.value)} />
                                     </div>
                                     <Button onClick={() => void saveProfile()} className="w-full bg-[#2F8E92] hover:bg-[#267276]" disabled={savingProfile}>
@@ -397,11 +397,11 @@ export default function ProfilePage() {
                             ) : null}
                         </Card>
 
-                        <Card className="p-6 border-gray-200">
-                            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <Card className="p-6 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                                 <Mail className="w-4 h-4" /> Email Change Request
                             </h3>
-                            <div className="text-sm text-gray-600 mb-3">Current Email: <span className="font-medium text-gray-900">{userEmail}</span></div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">Current Email: <span className="font-medium text-gray-900 dark:text-white">{userEmail}</span></div>
 
                             {!isPreviewMode ? (
                                 <div className="space-y-3">
@@ -413,12 +413,12 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="space-y-2">
                                         {emailRequests.length === 0 ? (
-                                            <div className="text-xs text-gray-500">No email change requests yet.</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">No email change requests yet.</div>
                                         ) : emailRequests.slice(0, 3).map((request) => (
-                                            <div key={request.id} className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2">
-                                                <div className="text-xs text-gray-700">
+                                            <div key={request.id} className="flex items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2">
+                                                <div className="text-xs text-gray-700 dark:text-gray-200">
                                                     {request.requested_email}
-                                                    <div className="text-gray-500">{new Date(request.requested_at).toLocaleString()}</div>
+                                                    <div className="text-gray-500 dark:text-gray-400">{new Date(request.requested_at).toLocaleString()}</div>
                                                 </div>
                                                 <Badge variant="outline" className={emailRequestTone(request.status)}>{request.status}</Badge>
                                             </div>
@@ -428,12 +428,12 @@ export default function ProfilePage() {
                             ) : null}
                         </Card>
 
-                        <Card className="p-6 border-gray-200">
-                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Availability Settings</h3>
+                        <Card className="p-6 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Availability Settings</h3>
                             {!isPreviewMode ? (
                                 <div className="space-y-4">
                                     <div>
-                                        <Label className="mb-2 block">Working Days</Label>
+                                        <Label className="mb-2 block dark:text-gray-200">Working Days</Label>
                                         <div className="flex flex-wrap gap-2">
                                             {DAY_OPTIONS.map((day) => {
                                                 const selected = workingDays.includes(day.value);
@@ -446,7 +446,7 @@ export default function ProfilePage() {
                                                             'h-9 px-3 rounded-lg border text-sm font-medium',
                                                             selected
                                                                 ? 'bg-[#2F8E92]/10 border-[#2F8E92] text-[#2F8E92]'
-                                                                : 'bg-white border-gray-200 text-gray-600',
+                                                                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300',
                                                         )}
                                                     >
                                                         {day.label}
@@ -458,25 +458,25 @@ export default function ProfilePage() {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
-                                            <Label>Start Time</Label>
+                                            <Label className="dark:text-gray-200">Start Time</Label>
                                             <Input type="time" value={workingHoursStart} onChange={(event) => setWorkingHoursStart(event.target.value)} />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label>End Time</Label>
+                                            <Label className="dark:text-gray-200">End Time</Label>
                                             <Input type="time" value={workingHoursEnd} onChange={(event) => setWorkingHoursEnd(event.target.value)} />
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                                    <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-800 px-3 py-2">
                                         <div>
-                                            <div className="text-sm font-medium text-gray-900">After-hours availability</div>
-                                            <div className="text-xs text-gray-500">Allow assignment requests after normal shift</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">After-hours availability</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">Allow assignment requests after normal shift</div>
                                         </div>
                                         <Switch checked={afterHoursEnabled} onCheckedChange={setAfterHoursEnabled} />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Out-of-office ranges</Label>
+                                        <Label className="dark:text-gray-200">Out-of-office ranges</Label>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                             <Input type="date" value={newRange.start_date} onChange={(event) => setNewRange((prev) => ({ ...prev, start_date: event.target.value }))} />
                                             <Input type="date" value={newRange.end_date} onChange={(event) => setNewRange((prev) => ({ ...prev, end_date: event.target.value }))} />
@@ -487,12 +487,12 @@ export default function ProfilePage() {
                                         </Button>
                                         <div className="space-y-2">
                                             {outOfOfficeRanges.length === 0 ? (
-                                                <div className="text-xs text-gray-500">No out-of-office ranges configured.</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">No out-of-office ranges configured.</div>
                                             ) : outOfOfficeRanges.map((range, index) => (
-                                                <div key={`${range.start_date}-${range.end_date}-${index}`} className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2">
+                                                <div key={`${range.start_date}-${range.end_date}-${index}`} className="flex items-center justify-between rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2">
                                                     <div className="text-xs">
-                                                        <div className="font-medium text-gray-800">{range.start_date} - {range.end_date}</div>
-                                                        <div className="text-gray-500">{range.note || 'Out of office'}</div>
+                                                        <div className="font-medium text-gray-800 dark:text-gray-100">{range.start_date} - {range.end_date}</div>
+                                                        <div className="text-gray-500 dark:text-gray-400">{range.note || 'Out of office'}</div>
                                                     </div>
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => setOutOfOfficeRanges((prev) => prev.filter((_, i) => i !== index))}>
                                                         <Trash2 className="w-4 h-4 text-red-500" />
@@ -512,10 +512,10 @@ export default function ProfilePage() {
                     </>
                 ) : (
                     <>
-                        <Card className="p-6 border-gray-200">
+                        <Card className="p-6 border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-4">
                                 {profilePictureUrl ? (
-                                    <img src={profilePictureUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-gray-200" />
+                                    <img src={profilePictureUrl} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
                                 ) : (
                                     <div className="w-16 h-16 rounded-full bg-[#2F8E92] flex items-center justify-center text-white text-2xl font-bold">
                                         {initials}
@@ -527,20 +527,20 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            <div className="mt-6 divide-y divide-gray-100">
+                            <div className="mt-6 divide-y divide-gray-100 dark:divide-gray-800">
                                 <div className="flex items-center justify-between py-3 text-sm">
-                                    <span className="text-gray-500">Email</span>
-                                    <span className="font-medium text-gray-900">{userEmail}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">Email</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">{userEmail}</span>
                                 </div>
                                 <div className="flex items-center justify-between py-3 text-sm">
-                                    <span className="text-gray-500">Phone</span>
-                                    <span className="font-medium text-gray-900">{userPhone}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">Phone</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">{userPhone}</span>
                                 </div>
                                 <div className="flex items-center justify-between py-3 text-sm">
-                                    <span className="text-gray-500">Status</span>
+                                    <span className="text-gray-500 dark:text-gray-400">Status</span>
                                     <span className={cn(
                                         'font-medium',
-                                        statusLabel.toLowerCase() === 'active' ? 'text-emerald-600' : 'text-gray-600',
+                                        statusLabel.toLowerCase() === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300',
                                     )}>
                                         {statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1)}
                                     </span>
@@ -548,27 +548,27 @@ export default function ProfilePage() {
                             </div>
                         </Card>
 
-                        <Card className="p-0 overflow-hidden border-gray-200">
+                        <Card className="p-0 overflow-hidden border-gray-200 dark:border-gray-800">
                             <button
                                 type="button"
-                                className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50"
+                                className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800/70"
                             >
-                                <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                                    <Bell className="w-4 h-4 text-gray-500" />
+                                <span className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <Bell className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                     Notifications
                                 </span>
-                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                             </button>
                             <button
                                 type="button"
-                                className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 border-t border-gray-100"
+                                className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800/70 border-t border-gray-100 dark:border-gray-800"
                                 onClick={openSettingsView}
                             >
-                                <span className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                                    <Settings className="w-4 h-4 text-gray-500" />
+                                <span className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <Settings className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                     Settings
                                 </span>
-                                <ChevronRight className="w-4 h-4 text-gray-400" />
+                                <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                             </button>
                         </Card>
                     </>
