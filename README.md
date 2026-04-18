@@ -11,7 +11,7 @@ Client-Crew Dispatch is an AI-assisted dispatch platform for SMS intake, job tra
 ## Make.com Main Scenario
 
 <p align="center">
-  <img src="docs/assets/makecom-main-scenario.svg" alt="Make.com main scenario used in Dispatch" />
+  <img src="docs/assets/makecom-main-scenario.png" alt="Make.com main scenario used in Dispatch" />
 </p>
 
 This scenario powers the dispatch intake pipeline:
@@ -33,7 +33,7 @@ Dispatch-System/
 |   `-- src/
 |-- docs/
 |   |-- assets/
-|   |   `-- makecom-main-scenario.svg
+|   |   `-- makecom-main-scenario.png
 |   `-- backend-technical-spec.md
 |-- README.md
 `-- .gitignore
