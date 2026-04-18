@@ -623,6 +623,205 @@ export const MOCK_DEALERSHIPS: Dealership[] = [
         allowed_actions: ['view_details', 'edit', 'deactivate'],
     }
 ];
+
+const createDemoJob = (
+    id: string,
+    jobCode: string,
+    status: string,
+    createdAt: string,
+    assignedTech?: string,
+): JobSummary => ({
+    id,
+    job_code: jobCode,
+    status,
+    created_at: createdAt,
+    assigned_tech: assignedTech,
+});
+
+const DEMO_DEALERSHIPS: Dealership[] = [
+    {
+        id: 'D-101',
+        name: 'Northwind Ford Center',
+        phone: '+1(555) 123-0001',
+        email: 'ops@northwindford.example.com',
+        address: '2850 Rivergate Blvd',
+        city: 'Sacramento',
+        postal_code: '95834',
+        status: 'active',
+        notes: 'After-hours key drop is on the west fence near bay 3.',
+        last_job_at: '2026-04-14T16:30:00Z',
+        recent_jobs: [
+            createDemoJob('job-d101-1', 'WS-2401', 'completed', '2026-04-14T16:30:00Z', 'Alicia Brown'),
+            createDemoJob('job-d101-2', 'WS-2369', 'scheduled', '2026-04-10T18:00:00Z', 'Marco Ruiz'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-102',
+        name: 'Harbor View Toyota',
+        phone: '+1(555) 123-0002',
+        email: 'service@harborviewtoyota.example.com',
+        address: '714 Harbor Front Ave',
+        city: 'San Diego',
+        postal_code: '92101',
+        status: 'active',
+        notes: 'Text dispatch lead before sending glass deliveries.',
+        last_job_at: '2026-04-15T19:45:00Z',
+        recent_jobs: [
+            createDemoJob('job-d102-1', 'WS-2410', 'in_progress', '2026-04-15T19:45:00Z', 'Jordan Lee'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-103',
+        name: 'Summit Honda',
+        phone: '+1(555) 123-0003',
+        email: 'dispatch@summithonda.example.com',
+        address: '988 Canyon Crest Dr',
+        city: 'Reno',
+        postal_code: '89502',
+        status: 'active',
+        notes: 'Morning appointments only on Saturdays.',
+        last_job_at: '2026-04-12T15:15:00Z',
+        recent_jobs: [
+            createDemoJob('job-d103-1', 'WS-2388', 'completed', '2026-04-12T15:15:00Z', 'Erin Patel'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-104',
+        name: 'Canyon Ridge Chevrolet',
+        phone: '+1(555) 123-0004',
+        email: 'accounts@canyonridgechevy.example.com',
+        address: '4100 East Mesa Parkway',
+        city: 'Phoenix',
+        postal_code: '85034',
+        status: 'inactive',
+        notes: 'Temporarily paused while the body shop is under renovation.',
+        recent_jobs: [],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-105',
+        name: 'Metroline Kia',
+        phone: '+1(555) 123-0005',
+        email: 'hello@metrolinekia.example.com',
+        address: '1625 Ventura Street',
+        city: 'Fresno',
+        postal_code: '93721',
+        status: 'active',
+        notes: '',
+        last_job_at: '2026-04-11T20:30:00Z',
+        recent_jobs: [
+            createDemoJob('job-d105-1', 'WS-2372', 'scheduled', '2026-04-11T20:30:00Z', 'Noah Kim'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-106',
+        name: 'Pacific Coast Mazda',
+        phone: '+1(555) 123-0006',
+        email: 'team@pacificcoastmazda.example.com',
+        address: '54 Redwood Loop',
+        city: 'Santa Rosa',
+        postal_code: '95401',
+        status: 'active',
+        notes: 'Preferred arrival window is 1 PM to 4 PM.',
+        recent_jobs: [],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-107',
+        name: 'Golden State Subaru',
+        phone: '+1(555) 123-0007',
+        email: 'ops@goldenstatesubaru.example.com',
+        address: '918 Grand Avenue',
+        city: 'Oakland',
+        postal_code: '94610',
+        status: 'active',
+        notes: '',
+        last_job_at: '2026-04-08T14:20:00Z',
+        recent_jobs: [
+            createDemoJob('job-d107-1', 'WS-2308', 'completed', '2026-04-08T14:20:00Z', 'Taylor Brooks'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-108',
+        name: 'Redwood Fleet Services',
+        phone: '+1(555) 123-0008',
+        email: 'fleet@redwoodfleet.example.com',
+        address: '300 Logistics Way',
+        city: 'San Jose',
+        postal_code: '95112',
+        status: 'active',
+        notes: 'Use fleet entrance and check in with the dispatch cage.',
+        last_job_at: '2026-04-13T21:10:00Z',
+        recent_jobs: [
+            createDemoJob('job-d108-1', 'WS-2399', 'in_progress', '2026-04-13T21:10:00Z', 'Devon Price'),
+            createDemoJob('job-d108-2', 'WS-2358', 'completed', '2026-04-09T16:40:00Z', 'Alicia Brown'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-109',
+        name: 'Blue Mesa Nissan',
+        phone: '+1(555) 123-0009',
+        email: 'service@bluemesanissan.example.com',
+        address: '725 Sunset Commerce Dr',
+        city: 'Las Vegas',
+        postal_code: '89118',
+        status: 'active',
+        notes: '',
+        recent_jobs: [],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-110',
+        name: 'Silver Lake Hyundai',
+        phone: '+1(555) 123-0010',
+        email: 'support@silverlakehyundai.example.com',
+        address: '1881 Arroyo Parkway',
+        city: 'Pasadena',
+        postal_code: '91105',
+        status: 'active',
+        notes: 'Call the advisor on arrival for calibration jobs.',
+        last_job_at: '2026-04-10T18:10:00Z',
+        recent_jobs: [
+            createDemoJob('job-d110-1', 'WS-2364', 'completed', '2026-04-10T18:10:00Z', 'Jordan Lee'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-111',
+        name: 'Valley Auto Group',
+        phone: '+1(555) 123-0011',
+        email: 'billing@valleyautogroup.example.com',
+        address: '6100 Copper Field Rd',
+        city: 'Bakersfield',
+        postal_code: '93308',
+        status: 'active',
+        notes: '',
+        recent_jobs: [],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+    {
+        id: 'D-112',
+        name: 'Sierra Commercial Trucks',
+        phone: '+1(555) 123-0012',
+        email: 'yard@sierrafleet.example.com',
+        address: '4420 Charter Oak Ave',
+        city: 'Stockton',
+        postal_code: '95206',
+        status: 'active',
+        notes: 'Dispatch van must enter through gate C for large glass orders.',
+        last_job_at: '2026-04-09T22:00:00Z',
+        recent_jobs: [
+            createDemoJob('job-d112-1', 'WS-2342', 'completed', '2026-04-09T22:00:00Z', 'Chris Morgan'),
+        ],
+        allowed_actions: ['view_details', 'edit', 'deactivate'],
+    },
+];
 // --- Components ---
 
 function StatusBadge({ status }: { status: 'active' | 'inactive' }) {
@@ -642,7 +841,7 @@ const DEALERSHIP_EXPORT_COLUMNS = [
     'Notes',
 ];
 
-const DEALERSHIPS_STORAGE_KEY = 'sm_dispatch_dealerships';
+const DEALERSHIPS_STORAGE_KEY = 'sm_dispatch_dealerships_demo_v2';
 
 const loadDealershipsFromStorage = (): Dealership[] | null => {
     try {
@@ -682,7 +881,7 @@ export default function DealershipsPage() {
     const [editForm, setEditForm] = useState<Dealership | null>(null);
 
     const loadLocalFallback = () => {
-        const source = loadDealershipsFromStorage() ?? MOCK_DEALERSHIPS;
+        const source = loadDealershipsFromStorage() ?? DEMO_DEALERSHIPS;
         const normalized = source.map((dealership) => ({
             ...dealership,
             phone: formatPhoneForDisplay(dealership.phone),
@@ -695,33 +894,17 @@ export default function DealershipsPage() {
     // Initial Fetch
     const fetchDealerships = async () => {
         setLoading(true);
-        const adminToken = getStoredAdminToken();
-
-        if (hasBackendAdminToken && adminToken) {
-            try {
-                const rows = await fetchAdminDealerships(adminToken);
-                if (rows.length > 0) {
-                    setDealerships(rows.map(mapBackendDealership));
-                    setIsBackendSynced(true);
-                } else {
-                    loadLocalFallback();
-                }
-                setLoading(false);
-                return;
-            } catch {
-                // Fall through to legacy local/mock mode.
-            }
-        }
+        setIsBackendSynced(false);
 
         setTimeout(() => {
             loadLocalFallback();
             setLoading(false);
-        }, 600);
+        }, 350);
     };
 
     useEffect(() => {
         void fetchDealerships();
-    }, [hasBackendAdminToken]);
+    }, []);
 
     const cityFilterOptions = Array.from(
         new Set(

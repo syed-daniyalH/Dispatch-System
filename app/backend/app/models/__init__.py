@@ -1,4 +1,5 @@
 from .audit_log import AuditLog
+from .calendar_event import CalendarEvent
 from .dealership import Dealership
 from .invoice import Invoice, InvoiceLineItem
 from .invoice_branding_settings import InvoiceBrandingSettings

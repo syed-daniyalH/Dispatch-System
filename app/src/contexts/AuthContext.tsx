@@ -482,12 +482,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Invalid admin credentials.');
       }
 
-      const tokenResponse = await fetchDevAdminToken();
-      setStoredAdminToken(tokenResponse.access_token);
-      setHasBackendAdminToken(true);
       clearStoredTechnicianToken();
       setHasBackendTechnicianToken(false);
-      await refreshBackendAdminData();
+
+      try {
+        const tokenResponse = await fetchDevAdminToken();
+        setStoredAdminToken(tokenResponse.access_token);
+        setHasBackendAdminToken(true);
+        await refreshBackendAdminData();
+      } catch (error) {
+        clearStoredAdminToken();
+        setHasBackendAdminToken(false);
+        console.warn('Admin backend token is unavailable. Continuing in UI-only mode until the API recovers.', error);
+      }
 
       setUser({
         ...currentUser,

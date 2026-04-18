@@ -24,6 +24,13 @@ class TimeOffEntryType(str, Enum):
     BREAK = "break"
 
 
+class CalendarEventType(str, Enum):
+    APPOINTMENT = "appointment"
+    DELIVERY = "delivery"
+    INVOICE = "invoice"
+    CUSTOM = "custom"
+
+
 class AuditEntityType(str, Enum):
     TECHNICIAN = "technician"
     DEALERSHIP = "dealership"
@@ -34,3 +41,4 @@ class AuditEntityType(str, Enum):
     TECHNICIAN_EMAIL_CHANGE_REQUEST = "technician_email_change_request"
     JOB = "job"
     INVOICE = "invoice"
+    CALENDAR_EVENT = "calendar_event"

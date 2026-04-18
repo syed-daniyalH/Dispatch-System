@@ -24,6 +24,34 @@ type DevTechnicianTokenResponse = {
   role: 'technician';
 };
 
+export type BackendCalendarEventType = 'appointment' | 'delivery' | 'invoice' | 'custom';
+
+export type BackendCalendarEvent = {
+  id: string;
+  title: string;
+  customer_name: string;
+  technician_id?: string | null;
+  technician_name?: string | null;
+  event_type: BackendCalendarEventType;
+  start_at: string;
+  end_at: string;
+  location?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BackendCalendarEventCreatePayload = {
+  title?: string;
+  customer_name: string;
+  technician_id?: string;
+  event_type: BackendCalendarEventType;
+  start_at: string;
+  end_at?: string;
+  location?: string;
+  notes?: string;
+};
+
 export type BackendTechnicianListItem = {
   id: string;
   name: string;
@@ -448,6 +476,37 @@ export async function fetchDevTechnicianToken(payload: {
 }): Promise<DevTechnicianTokenResponse> {
   return requestJson<DevTechnicianTokenResponse>('/auth/dev/technician-token', {
     method: 'POST',
+    body: payload,
+  });
+}
+
+export async function fetchAdminCalendarEvents(
+  token: string,
+  params?: {
+    from_date?: string;
+    to_date?: string;
+    technician_id?: string;
+    event_type?: BackendCalendarEventType;
+    search?: string;
+  },
+): Promise<BackendCalendarEvent[]> {
+  const search = new URLSearchParams();
+  if (params?.from_date) search.set('from_date', params.from_date);
+  if (params?.to_date) search.set('to_date', params.to_date);
+  if (params?.technician_id) search.set('technician_id', params.technician_id);
+  if (params?.event_type) search.set('event_type', params.event_type);
+  if (params?.search) search.set('search', params.search);
+  const suffix = search.toString() ? `?${search.toString()}` : '';
+  return requestJson<BackendCalendarEvent[]>(`/admin/calendar/events${suffix}`, { token });
+}
+
+export async function createAdminCalendarEvent(
+  token: string,
+  payload: BackendCalendarEventCreatePayload,
+): Promise<BackendCalendarEvent> {
+  return requestJson<BackendCalendarEvent>('/admin/calendar/events', {
+    method: 'POST',
+    token,
     body: payload,
   });
 }
